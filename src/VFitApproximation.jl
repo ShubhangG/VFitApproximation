@@ -184,7 +184,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractArray, λ::AbstractArray, tol
 
         cnt=cnt+1
     end
-    errors = plot_iters(trainerrarr,testerrarr,m,num,guessxi,guesslambda)   #Plots the training and testing errors incurred at
+    errors = plot_iters(trainerrarr,testerrarr,m,num)   #Plots the training and testing errors incurred at
 
     return r,errors
 
