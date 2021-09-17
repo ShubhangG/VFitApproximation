@@ -1,7 +1,14 @@
 name = "VFitApproximation"
 uuid = "f5054533-68e0-41c2-adcd-65cbda65cc54"
-authors = ["Shubhang Goswami <sgoswam3@illinois.edu> and contributors"]
+authors = ["Shubhang Goswami <sgoswam3@illinois.edu>"]
 version = "0.1.0"
+
+[deps]
+BaryRational = "91aaffc3-5777-4842-85b7-5d3d5d6a3494"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MathLink = "18c93696-a329-5786-9845-8443133fa0b4"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 julia = "1"
