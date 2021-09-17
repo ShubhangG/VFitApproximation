@@ -1,5 +1,3 @@
-using MathLink
-
 """
 This function creates the main denominator q(x) in MathLink expression for the VFit rational approximation.
 Inputs  psi weights,

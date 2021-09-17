@@ -6,6 +6,8 @@ using BaryRational
 using Random
 using Distributions
 using LinearAlgebra
+using PyPlot
+using MathLink
 
 include("MathematicaPipelining.jl")
 include("PlottingFuncs.jl")

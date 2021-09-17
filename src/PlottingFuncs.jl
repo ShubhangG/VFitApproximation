@@ -1,5 +1,3 @@
-using PyPlot
-
 """
 This function is used to plot the training and testing errors accumulated during multiple iterations of training
 """
