@@ -24,12 +24,12 @@ function rapprox(self::VFit,x::Float64)
         return r
 end
 
-```
+"""
 Function that samples points from an exponential distribution
-Inputs: theta of exponential distribution,
+Inputs  theta of exponential distribution,
         num is number of points
-Output: Returns num number of points sampled from an exponential distribution in (0,1)
-```
+Output  Returns num number of points sampled from an exponential distribution in (0,1)
+"""
 function create_sample_points(theta::Float64,num::Int)
     dist = Exponential(theta)
     pts = rand(dist,num)
@@ -39,13 +39,13 @@ function create_sample_points(theta::Float64,num::Int)
     return pts
 end
 
-```
+"""
 Function that samples points from a mixed distribution--- an exponential distribution (0,1) and a Uniform distribution [0.2,1)
-Input:  θ of the exponential distribution (θ*exp[-θ*x]),
+Input   θ of the exponential distribution (θ*exp[-θ*x]),
         prior for the mixed distribution and
         num = number of points to sample
-Output: Returns num number of points sampled from the mixed distribution with prior
-```
+Output  Returns num number of points sampled from the mixed distribution with prior
+"""
 function create_mixed_sample_points(theta::Float64,prior::Float64, num::Int)
     dist1 = Exponential(theta)
     dist2 = Uniform(0.2,1)
@@ -57,13 +57,13 @@ function create_mixed_sample_points(theta::Float64,prior::Float64, num::Int)
     return pts
 end
 
-```
+"""
 This function lets us obtain AAA approximation, if one chooses to start with an initial guess for poles as the AAA support points
-Inputs: f: function we are approximating,
-        mm: number of support points
+Inputs  f  function we are approximating,
+        mm number of support points
 
-Output: Returns a AAA approximation of the function.
-```
+Output Returns a AAA approximation of the function.
+"""
 function firstAAA_step(f::Function,mm::Int)
     Random.seed!(427)
     Z = create_sample_points(0.14,10000)
@@ -71,16 +71,16 @@ function firstAAA_step(f::Function,mm::Int)
     return aaa_out
 end
 
-```
+"""
 This function is used to calculate the barycentric weights by running a least square approximation to a matrix equation
 given by equation (A.4) in the RKFit paper
-Inputs  f:      the function that is being approximated,
-        lambda: the sample points,
-        xi:     the barycentric poles of p(x) and q(x)
+Inputs  f      the function that is being approximated,
+        lambda the sample points,
+        xi     the barycentric poles of p(x) and q(x)
 
-Outputs φ: The barycentric weights of the numerator p(x)
-        ψ: The barycentric weights of the denominator q(x)
-```
+Outputs φ The barycentric weights of the numerator p(x)
+        ψ The barycentric weights of the denominator q(x)
+"""
 function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
     m = length(xi)
     l = sort(lambda)
@@ -105,11 +105,11 @@ function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
 
 end
 
-```
+"""
 This function returns the roots and poles of q(x), the Barycentric denominator by pipelining it through Mathematica
-Inputs r_ := The rational function at the current step
-Outputs := Roots of the barycentric denominator
-```
+Inputs r_ = The rational function at the current step
+Outputs   = Roots of the barycentric denominator
+"""
 function Find_roots_using_Mathematica(r_ :: VFit)
     Darrexp  = build_denom.(r_.ψ,r_.poles)                                  #Write rational function denominator in correct form in MathLink expression
     Dexp = weval(addemup(Darrexp,length(Darrexp)))                          #Evaluate the built expression in MathLink form
@@ -125,11 +125,11 @@ function Find_roots_using_Mathematica(r_ :: VFit)
 end
 
 
-```
+"""
 Returns the square error of a rational function approximation on a test sample.
-Inputs r_:= The rational function, f:= the function to appoximate
+Inputs r_ = The rational function, f:= the function to appoximate
 Outputs Least square error
-```
+"""
 function get_sqrerr(r::VFit, f::Function)
     #test = rand(Uniform(0.01,1),500)
     Random.seed!(1234)                                      #This seed prevents the test dataset from changing
@@ -143,7 +143,7 @@ function get_sqrerr(r::VFit, f::Function)
     return sum(weights .* (residue.^2))
 end
 
-```
+"""
 The main part of the program that combines all the functions and runs the VFit Algorithm
 Inputs  f:=   The function to approximate
         m:=   The degree of the polynomials p(x) and q(x) that make up the rational function
@@ -153,7 +153,7 @@ Inputs  f:=   The function to approximate
 
 Outputs r     := The rational function
         errors:= The training and testing errors faced
-```
+"""
 function vfitting(f::Function, m::Int, ξ::AbstractArray, λ::AbstractArray, tol::Float64 =1e-10)
 
     cnt = 1                                                                 #Initialization of the count of iteration

@@ -1,8 +1,8 @@
 using PyPlot
 
-```
+"""
 This function is used to plot the training and testing errors accumulated during multiple iterations of training
-```
+"""
 function plot_iters(train_err, test_err, supp_pts,num,meth,lambmeth)
     pts = collect(range(1,length=length(train_err)))
     PyPlot.plot(pts,log10.(train_err),".-",label="training error")
