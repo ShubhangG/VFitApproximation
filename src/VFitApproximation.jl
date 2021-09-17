@@ -12,6 +12,7 @@ using MathLink
 include("MathematicaPipelining.jl")
 include("PlottingFuncs.jl")
 
+export VFit, rapprox
 
 mutable struct VFit
     φ::AbstractVector
