@@ -98,8 +98,8 @@ function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
     C = hcat(C1,C2)
 
     weights = zeros(Float64,length(l))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
-    weights[2:end] = l[2:end] - l[1:end-1]
-    weights[1]= l[1]
+    weights[2:end] = abs.(l[2:end] - l[1:end-1])
+    weights[1]= abs(l[1])
     W = Diagonal(sqrt.(weights))
     A = W*C
     P = A\(W*Y)
@@ -123,8 +123,15 @@ function Find_roots_using_Mathematica(r_ :: VFit)
         roots = roots[2:end]
     end
     #@assert(length(roots)==length(r_.poles))
-    (length(roots)==length(r_.poles)) ? (return (-1.0)*roots) : begin print(math2exp(Dfactored),"\n"); print(roots,"\n"); print("Quitting"); throw(DomainError(roots, "roots should be of length $(length(r_.poles))")) end
-    return (-1.0)*roots
+    if length(roots)==length(r_.poles)
+        (return (-1.0)*roots)
+    else
+        print(math2Expr(Dfactored),"\n")
+        print(roots,"\n")
+        print("Quitting and resending old roots as Factor[] reduced the order")
+        #throw(DomainError(roots, "roots should be of length $(length(r_.poles))")) end
+        return r_.poles
+    #return (-1.0)*roots
 end
 
 
