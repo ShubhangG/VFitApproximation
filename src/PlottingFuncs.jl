@@ -8,7 +8,7 @@ function plot_iters(train_err, test_err, supp_pts,num)
     xlabel("iterations")
     ylabel("Log of least square error")
     legend(bbox_to_anchor=(0.7,0.5))
-    title("Training and testing error in approximating Square Root (support points=5) in Vfit")
+    title("Training and testing error in approximating function (support points=$(supp_pts)) in Vfit")
     savefig("./plots/train_test_err_supp_$(supp_pts)_num_$(num).png")
     close("all")
 

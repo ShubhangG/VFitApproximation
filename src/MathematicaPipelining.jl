@@ -5,7 +5,12 @@ Inputs  psi weights,
 Outputs MathLink.WExpr The input expression of the denominator q(x) to Mathematica that is written in barycentric form
 """
 function build_denom(psi,z)
-    return W"Times"(psi,W"Power"(W"Plus"(-z,W"x"),-1))
+    if isa(z,Complex)
+        exp = W"Complex"(real(z),imag(z))
+        return W"Times"(psi,W"Power"(W"Plus"(W"Times"(exp,-1),W"x"),-1))
+    else
+        return W"Times"(psi,W"Power"(W"Plus"(-z,W"x"),-1))
+    end
 end
 
 """
@@ -22,52 +27,89 @@ function addemup(wexpr,idx)
         return W"Plus"(wexpr[idx],addemup(wexpr,idx-1))
     end
 end
-
 """
-This function is for extracting the factors/roots which Mathematica provides
-
+After using Mathematica to do the root finding, these set of recursive functions extract the roots from the syntax tree.
+These roots are passed into a Vector of complex numbers P that is returned as the output to Julia 
 """
-function ExtractExpr(num::Number,P::AbstractVector,Q::AbstractVector,powflag)
-    if powflag==1
-         push!(Q,Float64(num))
-    else
-         push!(P,Float64(num))
-    end
-    #print(num)
+
+function ExtractExpr(num::Number,P::AbstractVector)
+    push!(P,num)
 end
 
-function ExtractExpr(symb::MathLink.WSymbol,P::AbstractVector,Q::AbstractVector,powflag)
+function ExtractExpr(symb::MathLink.WSymbol,P::AbstractVector)
     #print(Symbol(symb.name))
 end
+
+function ExtractExpr(cmplxvec::Vector{Float64}, P::AbstractVector)
+    push!(P,complex(cmplxvec[1],cmplxvec[2]))
+end 
+
 """
-This function checks each condition in the output Mathematica syntax tree and finds the numbers in the numerator and denominator
-and places them into two vectors P and Q indicating the roots of p(x) and q(x) where the rational function is r = p/q
+This function extracts the numbers from the output of the Mathematica syntax tree and finds the numbers indicating the roots of q(x)  
 """
-function ExtractExpr(expr::MathLink.WExpr,P::AbstractVector,Q::AbstractVector,powflag)
-    if expr.head.name=="Times"
-        ExtractExpr.(expr.args,(P,),(Q,),powflag)
-    elseif expr.head.name=="Plus"
-        ExtractExpr.(expr.args,(P,),(Q,),powflag)
-    elseif expr.head.name=="Power"
-        ExtractExpr.(expr.args,(P,),(Q,),1)
+function ExtractExpr(expr::MathLink.WExpr,P::AbstractVector)
+    if expr.head.name=="Equal"
+        ExtractExpr.(expr.args,(P,))
+    elseif expr.head.name=="Complex"
+        ExtractExpr(expr.args,P)
+    elseif expr.head.name=="Or"
+        ExtractExpr.(expr.args,(P,))
+    elseif expr.head.name=="Roots" || expr.head.name=="Root"
+        print("Can't find roots! Try again")
+        push!(P,NaN)
+        return
     else
+        push!(P,eval(math2Expr(expr)))
+
     end
-    return P,Q
+    return P
 end
 
+"""
+A function that computes the output provided by mathematica if it is not in numeric form but still contains symbols and rationals.
+These set of functions do essentially what eval(math2Expr(WExpr)) does. 
 
 """
-Taken from UsingMathLink.jl by Github user gangchern
-`https://github.com/gangchern/usingMathLink`
-I used the parts that were needed for me.
-These set of functions converts the Mathematica syntax tree to a Julia expression tree, thus making it easier to read.
-"""
+function ComputeExpr(expr::MathLink.WExpr)
+    if expr.head.name=="Times"
+        return prod(map(ComputeExpr,expr.args))
+    elseif expr.head.name=="Plus"
+        return sum(map(ComputeExpr,expr.args))
+    elseif expr.head.name=="Power"
+        return ComputeExpr(expr.args[1])^(ComputeExpr(expr.args[2]))
+    elseif expr.head.name=="Rational"
+        return expr.args[1]/expr.args[2]
+    elseif expr.head.name=="Complex"
+        return complex(expr.args[1],expr.args[2])
+    end
+end
+
+function ComputeExpr(num::Number)
+    return num
+end 
+
+function ComputeExpr(symb::MathLink.WSymbol)
+    print("The symbol $(Symbol(symb.name)) shouldn't exist here!!")
+    exit()
+end
+
 function math2Expr(symb::MathLink.WSymbol)
     Symbol(symb.name)
 end
+
 function math2Expr(num::Number)
     num
 end
+
+function math2Expr(cmplx::Vector)
+    Meta.parse("$(complex(cmplx[1],cmplx[2]))")
+end
+"""
+Inspired from UsingMathLink.jl by Github user gangchern
+# `https://github.com/gangchern/usingMathLink`
+I changed it to suite my needs for extracting roots 
+
+"""
 function math2Expr(expr::MathLink.WExpr)
     if expr.head.name=="Times"
         return Expr(:call, :*, map(math2Expr,expr.args)...)
@@ -77,7 +119,71 @@ function math2Expr(expr::MathLink.WExpr)
         return Expr(:call, :^, map(math2Expr,expr.args)...)
     elseif expr.head.name=="Rational"
         return  Expr(:call, ://, map(math2Expr,expr.args)...)
+    elseif expr.head.name=="Equal"
+        return Expr(:call, Symbol("="), map(math2Expr, expr.args)...)
+    elseif expr.head.name=="Complex"
+        return math2Expr(expr.args)
+    elseif expr.head.name=="Or"
+        return map(math2Expr,expr.args)
     else
         return Expr(:call, Symbol(expr.head.name), map(math2Expr,expr.args)...)
     end
 end
+
+# """
+# This function is for extracting the factors/roots which Mathematica provides
+
+# """
+# function ExtractExpr(num::Number,P::AbstractVector,Q::AbstractVector,powflag)
+#     if powflag==1
+#          push!(Q,Float64(num))
+#     else
+#          push!(P,Float64(num))
+#     end
+#     #print(num)
+# end
+
+# function ExtractExpr(symb::MathLink.WSymbol,P::AbstractVector,Q::AbstractVector,powflag)
+#     #print(Symbol(symb.name))
+# end
+# """
+# This function checks each condition in the output Mathematica syntax tree and finds the numbers in the numerator and denominator
+# and places them into two vectors P and Q indicating the roots of p(x) and q(x) where the rational function is r = p/q
+# """
+# function ExtractExpr(expr::MathLink.WExpr,P::AbstractVector,Q::AbstractVector,powflag)
+#     if expr.head.name=="Times"
+#         ExtractExpr.(expr.args,(P,),(Q,),powflag)
+#     elseif expr.head.name=="Plus"
+#         ExtractExpr.(expr.args,(P,),(Q,),powflag)
+#     elseif expr.head.name=="Power"
+#         ExtractExpr.(expr.args,(P,),(Q,),1)
+#     end
+#     return P,Q
+# end
+
+
+# """
+# Taken from UsingMathLink.jl by Github user gangchern
+# `https://github.com/gangchern/usingMathLink`
+# I used the parts that were needed for me.
+# These set of functions converts the Mathematica syntax tree to a Julia expression tree, thus making it easier to read.
+# """
+# function math2Expr(symb::MathLink.WSymbol)
+#     Symbol(symb.name)
+# end
+# function math2Expr(num::Number)
+#     num
+# end
+# function math2Expr(expr::MathLink.WExpr)
+#     if expr.head.name=="Times"
+#         return Expr(:call, :*, map(math2Expr,expr.args)...)
+#     elseif expr.head.name=="Plus"
+#         return Expr(:call, :+,map(math2Expr,expr.args)...)
+#     elseif expr.head.name=="Power"
+#         return Expr(:call, :^, map(math2Expr,expr.args)...)
+#     elseif expr.head.name=="Rational"
+#         return  Expr(:call, ://, map(math2Expr,expr.args)...)
+#     else
+#         return Expr(:call, Symbol(expr.head.name), map(math2Expr,expr.args)...)
+#     end
+# end
