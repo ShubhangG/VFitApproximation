@@ -5,12 +5,20 @@ Inputs  psi weights,
 Outputs MathLink.WExpr The input expression of the denominator q(x) to Mathematica that is written in barycentric form
 """
 function build_denom(psi,z)
-    if isa(z,Complex)
-        exp = W"Complex"(real(z),imag(z))
-        return W"Times"(psi,W"Power"(W"Plus"(W"Times"(exp,-1),W"x"),-1))
-    else
-        return W"Times"(psi,W"Power"(W"Plus"(-z,W"x"),-1))
-    end
+    # if imag(z)!=0
+    #     expz = W"Complex"(real(z),imag(z))
+    # else
+    #     expz = real(z)
+    # end
+
+    # if imag(psi)!=0
+    #     exp_ps = W"Complex"(real(psi),imag(psi))
+    # else
+    #     exp_ps = real(psi) 
+    # end 
+    expz = W"Complex"(real(z),imag(z))
+    exp_ps = W"Complex"(real(psi),imag(psi))
+    return W"Times"(exp_ps,W"Power"(W"Plus"(W"Times"(expz,-1),W"x"),-1))
 end
 
 """
@@ -57,7 +65,7 @@ function ExtractExpr(expr::MathLink.WExpr,P::AbstractVector)
     elseif expr.head.name=="Roots" || expr.head.name=="Root"
         print("Can't find roots! Try again")
         push!(P,NaN)
-        return
+        return P
     else
         push!(P,eval(math2Expr(expr)))
 
@@ -131,7 +139,7 @@ function math2Expr(expr::MathLink.WExpr)
 end
 
 # """
-# This function is for extracting the factors/roots which Mathematica provides
+# This function is for extracting the factors/roots which Mathematica provides from Factor[]
 
 # """
 # function ExtractExpr(num::Number,P::AbstractVector,Q::AbstractVector,powflag)

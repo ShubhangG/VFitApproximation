@@ -8,11 +8,13 @@ using Distributions
 using LinearAlgebra
 using PyPlot
 using MathLink
+using DataFrames
 
 import StatsBase
 
 include("MathematicaPipelining.jl")
 include("PlottingFuncs.jl")
+include("SmoothPoleExtension.jl")
 
 export VFit, rapprox
 
@@ -22,9 +24,9 @@ mutable struct VFit
     poles::AbstractVector
 end
 
-function rapprox(self::VFit,x::Float64)
-    p = self.φ ./ (x .- self.poles)
-    q = self.ψ ./ (x .- self.poles)
+function rapprox(self::VFit,x::Union{Float64,Complex})
+    p = self.φ ./ (x .- self.poles .+ 1e-10)
+    q = self.ψ ./ (x .- self.poles .+ 1e-10)
     r = sum(p)/(1+sum(q))
     return r
 end
@@ -90,8 +92,8 @@ function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
     m = length(xi)
     l = sort(lambda)
     #l=lambda
-    C1 = zeros(Complex64,length(lambda),length(xi))
-    C2 = zeros(Complex64,length(lambda),length(xi))
+    C1 = zeros(ComplexF64,length(lambda),length(xi))
+    C2 = zeros(ComplexF64,length(lambda),length(xi))
     Y = f.(l)
     for j in 1:length(l)                                        #Build the initial matrix in RKFIT paper eq (A.4) to be solved
         C1[j,:] = 1 ./(l[j] .- xi)
@@ -101,29 +103,32 @@ function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
 
     weights = zeros(Float64,length(l))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
     weights[2:end] = abs.(l[2:end] - l[1:end-1])
-    weights[1]= abs(l[1])
+    weights[1]= weights[2]
     W = Diagonal(sqrt.(weights))
     A = W*C
-    P = A\(W*Y)
+    P = A \ (W*Y)
     #P = C\Y                                                    #Solve Cx=y matrix equation and get th phi's and psi's
     return P[1:m], P[m+1:2m]
 
 end
 
-function get_phi_psi(f_vec::Vector, l::Vector,xi::AbstractVector)
+
+function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector,weights::Vector = Float64[])
     m = length(xi)
-    C1 = zeros(Complex64,length(l),length(xi))
-    C2 = zeros(Complex64,length(l),length(xi))
+    C1 = zeros(ComplexF64,length(l),length(xi))
+    C2 = zeros(ComplexF64,length(l),length(xi))
     Y = f_vec
     for j in 1:length(l)                                        #Build the initial matrix in RKFIT paper eq (A.4) to be solved
         C1[j,:] = 1 ./(l[j] .- xi)
         C2[j,:] = -Y[j] ./(l[j] .- xi)
     end
     C = hcat(C1,C2)
+    if isempty(weights)
+        weights = zeros(Float64,length(l))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
+        weights[2:end] = abs.(l[2:end] - l[1:end-1])
+        weights[1]= weights[2]
+    end
 
-    weights = zeros(Float64,length(l))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
-    weights[2:end] = abs.(l[2:end] - l[1:end-1])
-    weights[1]= weights[2]
     W = Diagonal(sqrt.(weights))
     A = W*C
     P = A\(W*Y)
@@ -142,11 +147,13 @@ function Find_roots_using_Mathematica(r_ :: VFit)
     Darrexp  = build_denom.(r_.ψ,r_.poles)                                  #Write rational function denominator in correct form in MathLink expression
     Dexp = weval(addemup(Darrexp,length(Darrexp)))                          #Evaluate the built expression in MathLink form
     #Dfactored = weval(W"Factor"(Dexp))                                      #Run Factor from Mathematica to turn expression into (x-z_1)(x-z_2)....(x-z_m)/(x-p_1)(x-p_2)...(x-p_m)
-    Dfactored = weval(W"Reduce"(W"Equal"(Dexp,0),W"x"))                     #Run Reduce[] from Mathematica to get output x=z_1 || x=z_2 ... etc 
-    roots = ExtractExpr(Dfactored,Complex[])                                #Extract the roots (z_1,z_2,...z_m) from the denominator polynomial q(x)
+    Dfactored = weval(W"Roots"(W"Equal"(Dexp,0),W"x"))                     #Run Reduce[] from Mathematica to get output x=z_1 || x=z_2 ... etc 
+    #print("\n",math2Expr(Dfactored))
+    #print("\n",math2Expr(Dexp))
+    roots = ExtractExpr(Dfactored,ComplexF64[])                                #Extract the roots (z_1,z_2,...z_m) from the denominator polynomial q(x)
     if any(isnan,roots)
         Dfactored = weval(W"Reduce"(W"Equal"(Dexp,0),W"x"))                 #In the tricky case where Reduce does not provide roots we run Roots function hoping that it would
-        roots = ExtractExpr(Dfactored,Complex[])
+        roots = ExtractExpr(Dfactored,ComplexF64[])
         if any(isnan,roots)
             print("\n\nNo roots can be found! Exiting with same poles\n\n")
             return r_.poles
@@ -162,7 +169,7 @@ Returns the square error of a rational function approximation on a random test s
 Inputs r_ = The rational function, f:= the function to appoximate
 Outputs Least square error
 """
-function get_sqrerr(r::VFit, f::Function, test::Vector{Float64})
+function get_sqrerr(r::VFit, f::Function, test::AbstractVector)
     #test = rand(Uniform(0.01,1),500)
     #Random.seed!(1234)                                      #This seed prevents the test dataset from changing                                      
     #test = sort(rand(Uniform(0.01,1),500))
@@ -183,14 +190,16 @@ Returns the square error of a rational function approximation on a test sample p
     Outputs Least square error
 
 """
-function get_sqrerr(r::VFit, f_testdf::Matrix)
+function get_sqrerr(r::VFit, f_testdf::DataFrame, weights::Vector = Float64[])
     f_testdf = f_testdf[sortperm(f_testdf[:,1]),:]
     residue = rapprox.((r,),f_testdf[:,1]) .- (f_testdf[:,2])
     
     test_vec = f_testdf[:,1]
-    weights = zeros(Float64,length(test_vec))
-    weights[2:end] = abs.(test_vec[2:end] - test_vec[1:end-1])
-    weights[1]= weights[2]
+    if isempty(weights)
+        weights = zeros(Float64,length(test_vec))
+        weights[2:end] = abs.(test_vec[2:end] - test_vec[1:end-1])
+        weights[1]= weights[2]
+    end
 
     
     return sum(weights .* ((abs.(residue)).^2))
@@ -208,7 +217,7 @@ Inputs  f:=   The function to approximate
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::Vector{Float64}, λ::Vector{Float64}, tol::Float64 =1e-10)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, tol::Float64 =1e-10)
 
     cnt = 1                                                                 #Initialization of the count of iteration
     phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
@@ -233,7 +242,7 @@ function vfitting(f::Function, m::Int, ξ::Vector{Float64}, λ::Vector{Float64},
         push!(trainerrarr,self_err)
         r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
         r.φ, r.ψ = get_phi_psi(f,λ,r.poles)                                 #Get the next φ and ψ and update the rational function
-
+        #print("\nPoles\n",r.poles)
         cnt=cnt+1
     end
     errors = plot_iters(trainerrarr,testerrarr,m,num)   #Plots the training and testing errors incurred at
@@ -250,11 +259,12 @@ Inputs  f_df:=  The function to approximate in the form of an Array which includ
         m:=     The degree of the polynomials p(x) and q(x) that make up the rational function
         ξ:=     The initial guess of starting support points for the barycentric forms
         tol:=   The tolerance of the least square error, defaults to 1e-10
+        weightvec:= A vector of weights for each data point. The length of this vector should be same as the number of datapoints
 
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f_df::Matrix, m::Int, ξ::Vector{Float64}, tol::Float64 =1e-10)
+function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[])
     cnt = 1                                                                 #Initialization of the count of iteration
     
     #Split Training and testing into 80 percent train and 20 percent test
@@ -262,15 +272,34 @@ function vfitting(f_df::Matrix, m::Int, ξ::Vector{Float64}, tol::Float64 =1e-10
     # tr_num = Int(floor(0.8*length(ixs)))
     # f_train = f_df[ixs[1:tr_num],:]
     # f_test = f_df[ixs[tr_num+1:end],:]
+    # if !isempty(weightvec)
+    #     weights_train = weightvec[ixs[1:tr_num],:]
+    #     weights_test  = weighvec[ixs[tr_num+1:end],:]
+    # end
     
-    #Odd-Even splitting
-    f_df = f_df[sortperm(f_df[:,1]),:]
-    f_train = f_df[2:2:length(f_df[:,1]),:]                                 #extracts all the even elements out
-    f_test = f_df[1:2:length(f_df[:,1]),:]
+    # #Odd-Even splitting
+    # f_df = f_df[sortperm(f_df[:,1]),:]
+    # f_train = f_df[2:2:length(f_df[:,1]),:]                                 #extracts all the even elements out
+    # f_test = f_df[1:2:length(f_df[:,1]),:]
+    # if !isempty(weightvec)
+    #     weights_train = weightvec[2:2:length(f_df[:,1])]
+    #     weights_test  = weightvec[1:2:length(f_df[:,1])]
+    # else
+    #     weights_train = Float64[]
+    #     weights_test  = Float64[]
+    # end
+ 
 
     #All points
-    # f_train = f_df
-    # f_test = f_df
+    f_train = f_df
+    f_test  = f_df
+    if !isempty(weightvec)
+        weights_train = weightvec
+        weights_test  = weightvec
+    else
+        weights_train = Float64[]
+        weights_test  = Float64[]
+    end
 
     f_train = f_train[sortperm(f_train[:,1]),:]                              #Sort the data
     f_vec = f_train[:,2]
@@ -279,7 +308,7 @@ function vfitting(f_df::Matrix, m::Int, ξ::Vector{Float64}, tol::Float64 =1e-10
 
 
     #Start the training
-    phi,psi = get_phi_psi(f_vec,λ,ξ)                                     #Get the first φ and ψ
+    phi,psi = get_phi_psi(f_vec,λ,ξ,weights_train)                                     #Get the first φ and ψ
     r = VFit(phi,psi,ξ)                                                      #Initialize the rational approximation r
 
     num= length(λ)
@@ -288,7 +317,7 @@ function vfitting(f_df::Matrix, m::Int, ξ::Vector{Float64}, tol::Float64 =1e-10
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(test_sqres)\n")
-    while (test_sqres>tol) && (cnt<51)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
+    while (test_sqres>tol) && (cnt<41)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         test_sqres = get_sqrerr(r,f_test)
         self_err = get_sqrerr(r,f_train)
@@ -297,11 +326,11 @@ function vfitting(f_df::Matrix, m::Int, ξ::Vector{Float64}, tol::Float64 =1e-10
         push!(testerrarr,test_sqres)
         push!(trainerrarr,self_err)
         r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
-        r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles)                             #Get the next φ and ψ and update the rational function
+        r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles,weights_train)                             #Get the next φ and ψ and update the rational function
 
         cnt=cnt+1
     end
-    errors = plot_iters(trainerrarr,testerrarr,m,num)                       #Plots the training and testing errors incurred at
+    errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)                       #Plots the training and testing errors incurred at
 
     return r,errors
 
