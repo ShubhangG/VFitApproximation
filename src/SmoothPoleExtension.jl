@@ -110,7 +110,7 @@ function GD_pole_update(f_df,ξ,w::Vector=Float64[],tol=1e-10)
     cnt = 0
 
     φ,ψ = update_φ_ψ(F_vec,λ,ξ,w)
-    r = VFit(φ,ψ,ξ)
+    r = VFitApproximation.VFit(φ,ψ,ξ)
 
     Err_vec = []
     Loss = loss_calc(r,f_df,w)
