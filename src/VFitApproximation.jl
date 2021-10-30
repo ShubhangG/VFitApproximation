@@ -245,7 +245,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, t
         #print("\nPoles\n",r.poles)
         cnt=cnt+1
     end
-    errors = plot_iters(trainerrarr,testerrarr,m,num)   #Plots the training and testing errors incurred at
+    errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)   #Plots the training and testing errors incurred at
 
     return r,errors
 
@@ -335,6 +335,14 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-
     return r,errors
 
 end
+
+
+
+
+
+
+
+
 
 end 
 
