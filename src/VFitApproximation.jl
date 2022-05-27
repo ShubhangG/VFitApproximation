@@ -9,6 +9,7 @@ using LinearAlgebra
 using PyPlot
 using MathLink
 using DataFrames
+using Polynomials
 
 import StatsBase
 
@@ -164,6 +165,20 @@ function Find_roots_using_Mathematica(r_ :: VFit)
     return roots 
 end
 
+"""
+This function returns the roots of the barycentric denominator q(x). The method below uses Julia's Polynomials.jl package. Thus keeping the procedure native
+Inputs r_ = The rational function at the current step
+Outputs   = Roots of the barycentric denominator
+"""
+function Find_roots_julia(r_ :: VFit)
+    m = length(r_.poles)
+    p = fromroots(r_.poles)
+    for j=1:m
+        p += r_.ψ[j]*fromroots(deleteat!(copy(r_.poles),j))
+    end
+    return roots(p)
+end
+
 
 """
 Returns the square error of a rational function approximation on a random test sample.
@@ -233,7 +248,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, t
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(sqres)\n")
-    while (self_err>tol || sqres>10*tol) && cnt<51                          #Convergence criteria of 10 used-- if iteration is >10 times it is probably stuck in some local minima
+    while (self_err>tol || sqres>10*tol) && cnt<101                          #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         sqres = get_sqrerr(r,f,test_λ)
         self_err = get_sqrerr(r,f,λ)
@@ -241,7 +256,8 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, t
         print(" The square error is: ",sqres,"\n")
         push!(testerrarr,sqres)
         push!(trainerrarr,self_err)
-        r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
+        #r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
+        r.poles = Find_roots_julia(r)
         r.φ, r.ψ = get_phi_psi(f,λ,r.poles)                                 #Get the next φ and ψ and update the rational function
         #print("\nPoles\n",r.poles)
         cnt=cnt+1
@@ -318,7 +334,7 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(test_sqres)\n")
-    while (test_sqres>tol) && (cnt<41)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
+    while (test_sqres>tol) && (cnt<101)                                             #Convergence criteria of 100 used-- if iteration is >50 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         test_sqres = get_sqrerr(r,f_test)
         self_err = get_sqrerr(r,f_train)
@@ -326,7 +342,8 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-
         print(" The square error is: ",test_sqres,"\n")
         push!(testerrarr,test_sqres)
         push!(trainerrarr,self_err)
-        r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
+        #r.poles = Find_roots_using_Mathematica(r)                                         #Update the poles of the rational function
+        r.poles = Find_roots_julia(r)
         r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles,weights_train)                             #Get the next φ and ψ and update the rational function
 
         cnt=cnt+1
@@ -350,21 +367,21 @@ function Γ_regrr(λ_φ,λ_ψ,m)
 end
 
 """
-Get Phi and Psi 
+Get Phi and Psi and Xi
 """
-function update_φ_ψ(f_vec::Vector, l::AbstractVector,xi::AbstractVector,weights::Vector = Float64[])
-    m = length(xi)
-    C1 = zeros(ComplexF64,length(l),length(xi))
-    C2 = zeros(ComplexF64,length(l),length(xi))
+function update_φ_ψ(f_vec::Vector, λ::AbstractVector,ξ::AbstractVector,weights::Vector = Float64[],α=1.0)
+    m = length(ξ)
+    C1 = zeros(ComplexF64,length(λ),length(ξ))
+    C2 = zeros(ComplexF64,length(λ),length(ξ))
     Y = f_vec
-    for j in 1:length(l)                                        #Build the initial matrix in RKFIT paper eq (A.4) to be solved
-        C1[j,:] = 1 ./(l[j] .- xi)
-        C2[j,:] = -Y[j] ./(l[j] .- xi)
+    for j in 1:length(λ)                                        #Build the initial matrix in RKFIT paper eq (A.4) to be solved
+        C1[j,:] = 1 ./(λ[j] .- ξ)
+        C2[j,:] = -Y[j] ./(λ[j] .- ξ)
     end
     C = hcat(C1,C2)
     if isempty(weights)
-        weights = zeros(Float64,length(l))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
-        weights[2:end] = abs.(l[2:end] - l[1:end-1])
+        weights = zeros(Float64,length(λ))                          #If there are a lot of samples near a singularity then they will dominate the error, these weights help reweight the uneven sampling
+        weights[2:end] = diff(λ)
         weights[1]= weights[2]
     end
 
@@ -373,10 +390,41 @@ function update_φ_ψ(f_vec::Vector, l::AbstractVector,xi::AbstractVector,weight
     b = W*Y
 
     #Build Γ
-    Γ = Γ_regrr(0,1,m)
-    P = (A'A + Γ'Γ)\(A'b)
+    Γ = Γ_regrr(0,α,m)
+    P = (A'A + Γ + 1e-7I)\(A'b)
 
-    return P[1:m], P[m+1:2m]
+    v = A*P - b
+    loss = v'*v + P'*Γ*P
+    
+    φ = P[1:m]
+    ψ = P[m+1:end]
+
+    #dAxv = zeros(ComplexF64,length(λ),length(r.poles))
+    #x = vcat(r.φ,r.ψ)
+    #g2 = zeros(ComplexF64,length(λ),length(r.poles))
+    grad = zeros(ComplexF64,m)
+
+    for i in 1:m
+        g = 0.0
+        for j in 1:length(λ)
+            # p  = sum(r.φ ./ (λ[j] .- r.poles))
+            # q  = sum(r.ψ ./ (λ[j] .- r.poles))
+            # dp = r.φ ./ ((λ[j] .- r.poles).^2)
+            # dq = r.ψ ./ ((λ[j] .- r.poles).^2) 
+            
+            # g2[j,:] = l[j].*(dp ./(1+q) .- (p/((1+q)^2) .* dq))
+            
+            # dA[j,1:length(r.φ)] = -1.0./((λ[j] .- r.poles).^2)
+            # dA[j,length(r.φ)+1:end] = Y[j]./((λ[j] .- r.poles).^2) 
+
+            dA_dξ_x = (1.0 / ((λ[j] - ξ[i])^2)) * (φ[i] - Y[j]*ψ[i])
+            g = g + dA_dξ_x' * v[j]
+        end
+        grad[i] = g
+    end
+
+
+    return φ,ψ, grad, real(loss)
 end
 
 """
@@ -388,49 +436,61 @@ function loss_calc(r::VFit,f_df::DataFrame,weights::Vector = Float64[])
     test_vec = f_df[:,1]
     if isempty(weights)
         weights = zeros(Float64,length(test_vec))
-        weights[2:end] = diff(weights)
+        weights[2:end] = diff(test_vec)
         weights[1]= weights[2]
     end
 
 
-    loss = sum(weights .* abs2.(l)) + sum(abs2.(r.ψ))
+    #loss = sum(weights .* abs2.(l)) + sum(abs2.(r.ψ))
+    loss = sum(weights .* abs2.(l))
     return loss
 end
 
 """
 Build Least squares differential for updating xi
 """
-function grad_L(r::VFit,f_df::DataFrame,weights::Vector = Float64[])
-    l = rapprox.((r,),f_df[:,1]) .- f_df[:,2]
+function grad_L(r::VFit,f_df::DataFrame,l::Vector=Float64[],weights::Vector = Float64[])
+    f_df = f_df[sortperm(f_df[:,1]),:]
+
+    if isempty(l)
+        l = rapprox.((r,),f_df[:,1]) .- f_df[:,2]
+    end
 
     test_vec = f_df[:,1]
     if isempty(weights)
         weights = zeros(Float64,length(test_vec))
-        weights[2:end] = diff(weights)
+        weights[2:end] = diff(test_vec)
         weights[1]= weights[2]
     end
-    l= sqrt.(weights) .* l
-    dA = zeros(ComplexF64,length(l),length(r.φ)+length(r.ψ))
-    x = vcat(r.φ,r.ψ)
-    g2 = zeros(ComplexF64,length(l),length(r.poles))
-    #grad = 0.0
+
+    l = sqrt.(weights) .* l
+    #dAxv = zeros(ComplexF64,length(l),length(r.poles))
+    #x = vcat(r.φ,r.ψ)
+    #g2 = zeros(ComplexF64,length(l),length(r.poles))
+    grad = zeros(ComplexF64,length(r.poles))
     λ = f_df[:,1]
     Y = f_df[:,2]
-    for j in 1:length(l)
-        # p  = sum(r.φ ./ (λ[j] .- r.poles))
-        # q  = sum(r.ψ ./ (λ[j] .- r.poles))
-        # dp = r.φ ./ ((λ[j] .- r.poles).^2)
-        # dq = r.ψ ./ ((λ[j] .- r.poles).^2) 
-        
-        # g2[j,:] = l[j].*(dp ./(1+q) .- (p/((1+q)^2) .* dq))
-        
-        dA[j,1:length(r.φ)] = -1.0./((λ[j] .- r.poles).^2)
-        dA[j,length(r.φ)+1:end] = Y[j]./((λ[j] .- r.poles).^2) 
-        
-    end
-    #grad = sum(g2,dims=1)
     
-    grad = x'*dA'*l
+
+    for i in 1:length(r.poles)
+        g = 0.0
+        for j in 1:length(l)
+            # p  = sum(r.φ ./ (λ[j] .- r.poles))
+            # q  = sum(r.ψ ./ (λ[j] .- r.poles))
+            # dp = r.φ ./ ((λ[j] .- r.poles).^2)
+            # dq = r.ψ ./ ((λ[j] .- r.poles).^2) 
+            
+            # g2[j,:] = l[j].*(dp ./(1+q) .- (p/((1+q)^2) .* dq))
+            
+            # dA[j,1:length(r.φ)] = -1.0./((λ[j] .- r.poles).^2)
+            # dA[j,length(r.φ)+1:end] = Y[j]./((λ[j] .- r.poles).^2) 
+
+            dA_dξ_x = (1.0 / ((λ[j] - r.poles[i])^2)) * (r.φ[i] - Y[j]*r.ψ[i])
+            g = g + dA_dξ_x' * l[j]
+        end
+        grad[i] = g
+    end
+    
     return grad
 end
 
@@ -438,7 +498,7 @@ end
 """
 Build least squares with Gradient Descent for ξ
 """
-function GD_pole_update(f_df,ξ,w::Vector=Float64[],tol=1e-10)
+function GD_pole_update(f_df,ξ,w::Vector=Float64[],α=1.0,tol=1e-10)
 
     F_vec = f_df[:,2]
     λ = f_df[:,1]
@@ -448,29 +508,44 @@ function GD_pole_update(f_df,ξ,w::Vector=Float64[],tol=1e-10)
     max_count = 500
     cnt = 0
 
-    φ,ψ = update_φ_ψ(F_vec,λ,ξ,w)
+    φ,ψ,gl,loss = update_φ_ψ(F_vec,λ,ξ,w,α)
     r = VFit(φ,ψ,ξ)
 
     Err_vec = []
-    Loss = loss_calc(r,f_df,w)
-    push!(Err_vec,Loss)
+    Loss_vec = []
+    Gammas = []
+    err = loss_calc(r,f_df,w)
+    push!(Err_vec,err)
     #Update poles via GD
-    while (Loss>=tol) && (cnt<=max_count)
+    while (err>=tol) && (cnt<=max_count)
         print("At iteration ",cnt)
-        print(" The Squared Loss is ",Loss,"\n")
-        gl = grad_L(r,f_df,w)'
+        print(" The Squared Error is ",err,"\n")
+        r.φ, r.ψ, gl, loss = update_φ_ψ(F_vec,λ,r.poles,w,α)
+        print(" The Squared Loss is ",loss,"\n")
+        push!(Loss_vec,loss)
+        err = loss_calc(r,f_df,w)
+        # gl = grad_L(r,f_df,loss,w)
         γ = dot(r.poles .- prev_ξ, gl .- ∇L)./dot(gl .- ∇L, gl .- ∇L)
-        ∇L = gl
-        prev_ξ = r.poles
-        r.poles = vec(r.poles .- γ.*∇L)
-        r.φ, r.ψ = update_φ_ψ(F_vec,λ,r.poles,w)
-        Loss = loss_calc(r,f_df,w)
+        #γ = 1e-2
+        ∇L .= gl
+        prev_ξ .= r.poles
+        r.poles .= r.poles .- γ.*∇L
+        #r.φ, r.ψ = update_φ_ψ(F_vec,λ,r.poles,w)
         cnt+=1
-        push!(Err_vec,Loss)
+        push!(Err_vec,err)
+        push!(Gammas,abs(γ))
     end 
+    
+    r.φ, r.ψ, gl, loss = update_φ_ψ(F_vec,λ,r.poles,w,α)
+    push!(Err_vec,loss_calc(r,f_df,w))
+    push!(Loss_vec,loss)
 
-    gd_error_plot(Err_vec,length(ξ),length(λ),cnt)
-    return r,Err_vec
+    
+    #PyPlot.show()
+    print("\n The alpha value is $(α) \n")
+    gd_error_plot(Err_vec,length(ξ),length(λ),cnt,α)
+    gd_loss_plot(Loss_vec,length(ξ),length(λ),cnt,Gammas,α)
+    return r,Err_vec,Loss_vec
 end
 
 

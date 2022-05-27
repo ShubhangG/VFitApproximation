@@ -9,13 +9,14 @@ function plot_iters(train_err, test_err, supp_pts,num,cnt)
     ylabel("Log of least square error")
     legend(bbox_to_anchor=(0.7,0.5))
     title("Training and testing error in approximating function (support points=$(supp_pts)) in Vfit")
+    PyPlot.show()
     savefig("./plots/train_test_err_supp_$(supp_pts)_num_$(num)_in_$(cnt)counts.png")
     close("all")
 
     return (train_err, test_err)
 end
 
-function gd_error_plot(train_err, supp_pts,num,cnt)
+function gd_error_plot(train_err, supp_pts,num,cnt,α)
     pts = collect(range(1,length=length(train_err)))
     PyPlot.plot(pts,log10.(train_err),".-",label="training error")
     #PyPlot.plot(pts,log10.(test_err),"-", label="testing error")
@@ -23,7 +24,22 @@ function gd_error_plot(train_err, supp_pts,num,cnt)
     ylabel("Log of least square error")
     legend(bbox_to_anchor=(0.7,0.5))
     title("Training error in approximating function (support points=$(supp_pts)) in Vfit")
-    savefig("./plots/GD_train_test_err_supp_$(supp_pts)_num_$(num)_in_$(cnt)counts.png")
+    savefig("./plots/GD_train_test_err_regrr$(α)_supp_$(supp_pts)_num_$(num)_in_$(cnt)counts.png")
+    close("all")
+
+    #return (train_err, test_err)
+
+end
+
+function gd_loss_plot(train_err, supp_pts,num,cnt,Gammas,α)
+    pts = collect(range(1,length=length(train_err)))
+    PyPlot.plot(pts,train_err,".-",label="training loss")
+    #PyPlot.plot(pts,log10.(test_err),"-", label="testing error")
+    xlabel("Gradient Descent iterations")
+    ylabel("Loss")
+    legend(bbox_to_anchor=(0.7,0.5))
+    title("Training error in approximating function (support points=$(supp_pts)) in Vfit")
+    savefig("./plots/GD_train_test_LossPlot_regrr$(α)_supp_$(supp_pts)_num_$(num)_in_$(cnt)counts_learning$(((Gammas[1]+Gammas[end])/2)).png")
     close("all")
 
     #return (train_err, test_err)

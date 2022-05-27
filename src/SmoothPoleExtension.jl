@@ -49,7 +49,7 @@ function loss_calc(r::VFitApproximation.VFit,f_df::DataFrame,weights::Vector = F
     test_vec = f_df[:,1]
     if isempty(weights)
         weights = zeros(Float64,length(test_vec))
-        weights[2:end] = diff(weights)
+        weights[2:end] = diff()
         weights[1]= weights[2]
     end
 
@@ -119,12 +119,13 @@ function GD_pole_update(f_df,ξ,w::Vector=Float64[],tol=1e-10)
     while (Loss>=tol) && (cnt<=max_count)
         print("At iteration ",cnt)
         print(" The Squared Loss is ",Loss,"\n")
+        r.φ, r.ψ = update_φ_ψ(F_vec,λ,r.poles,w)
         gl = grad_L(r,f_df,w)'
         γ = dot(r.poles .- prev_ξ, gl .- ∇L)./dot(gl .- ∇L, gl .- ∇L)
         ∇L = gl
         prev_ξ = r.poles
         r.poles = vec(r.poles .- γ.*∇L)
-        r.φ, r.ψ = update_φ_ψ(F_vec,λ,r.poles,w)
+        
         Loss = loss_calc(r,f_df,w)
         cnt+=1
         push!(Err_vec,Loss)
