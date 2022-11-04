@@ -248,7 +248,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, t
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(sqres)\n")
-    while (self_err>tol || sqres>10*tol) && cnt<101                          #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
+    while (self_err>tol || sqres>10*tol) && cnt<21                          #Convergence criteria of 20 used-- if iteration is >20 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         sqres = get_sqrerr(r,f,test_λ)
         self_err = get_sqrerr(r,f,λ)
@@ -334,7 +334,7 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(test_sqres)\n")
-    while (test_sqres>tol) && (cnt<101)                                             #Convergence criteria of 100 used-- if iteration is >50 times it is probably stuck in some local minima
+    while (test_sqres>tol) && (cnt<21)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         test_sqres = get_sqrerr(r,f_test)
         self_err = get_sqrerr(r,f_train)
