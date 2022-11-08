@@ -224,16 +224,17 @@ end
 
 """
 The main part of the program that combines all the functions and runs the VFit Algorithm
-Inputs  f:=   The function to approximate
-        m:=   The degree of the polynomials p(x) and q(x) that make up the rational function
-        ξ:=   The initial guess of starting support points for the barycentric forms
-        λ:=   The training sample points over which the VFit approximation will be made
-        tol:= The tolerance of the least square error, defaults to 1e-10
+Inputs  f:=               The function to approximate
+        m:=               The degree of the polynomials p(x) and q(x) that make up the rational function
+        ξ:=               The initial guess of starting support points for the barycentric forms
+        λ:=               The training sample points over which the VFit approximation will be made
+        tol:=             The tolerance of the least square error, defaults to 1e-10
+        force_conjugacy:= Set to true if you want to enforce the approximation to be real. Use for approximating real valued functions
 
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, tol::Float64 =1e-10)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, tol::Float64 =1e-10,force_conjugacy=false)
 
     cnt = 1                                                                 #Initialization of the count of iteration
     phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
@@ -257,13 +258,19 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, t
         push!(testerrarr,sqres)
         push!(trainerrarr,self_err)
         #r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
-        r.poles = Find_roots_julia(r)
+        new_poles = Find_roots_julia(r)
+        if force_conjugacy
+            r.poles = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+        else
+            r.poles = new_poles
+        end
+         
         r.φ, r.ψ = get_phi_psi(f,λ,r.poles)                                 #Get the next φ and ψ and update the rational function
         #print("\nPoles\n",r.poles)
         cnt=cnt+1
     end
-    errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)   #Plots the training and testing errors incurred at
-
+    #errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)   #Plots the training and testing errors incurred at
+    errors = (trainerrarr,testerrarr)
     return r,errors
 
 end
@@ -277,11 +284,12 @@ Inputs  f_df:=  The function to approximate in the form of an Array which includ
         ξ:=     The initial guess of starting support points for the barycentric forms
         tol:=   The tolerance of the least square error, defaults to 1e-10
         weightvec:= A vector of weights for each data point. The length of this vector should be same as the number of datapoints
+        force_conjugacy:= Set to true if you want to enforce the approximation to be real. Use for approximating real valued functions
 
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[])
+function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[], force_conjugacy=false)
     cnt = 1                                                                 #Initialization of the count of iteration
     
     #Split Training and testing into 80 percent train and 20 percent test
@@ -343,13 +351,19 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-
         push!(testerrarr,test_sqres)
         push!(trainerrarr,self_err)
         #r.poles = Find_roots_using_Mathematica(r)                                         #Update the poles of the rational function
-        r.poles = Find_roots_julia(r)
+        new_poles = Find_roots_julia(r)
+        if force_conjugacy
+            r.poles = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+        else
+            r.poles = new_poles
+        end
+        
         r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles,weights_train)                             #Get the next φ and ψ and update the rational function
 
         cnt=cnt+1
     end
-    errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)                       #Plots the training and testing errors incurred at
-
+    #errors = plot_iters(trainerrarr,testerrarr,m,num,cnt)                       #Plots the training and testing errors incurred at
+    errors = (trainerrarr,testerrarr)
     return r,errors
 
 end
