@@ -7,13 +7,13 @@ using Random
 using Distributions
 using LinearAlgebra
 using PyPlot
-using MathLink
+#using MathLink
 using DataFrames
 using Polynomials
 
 import StatsBase
 
-include("MathematicaPipelining.jl")
+#include("MathematicaPipelining.jl")
 include("PlottingFuncs.jl")
 #include("SmoothPoleExtension.jl")
 
@@ -145,25 +145,25 @@ This function returns the roots and poles of q(x), the Barycentric denominator b
 Inputs r_ = The rational function at the current step
 Outputs   = Roots of the barycentric denominator
 """
-function Find_roots_using_Mathematica(r_ :: VFit)
-    Darrexp  = build_denom.(r_.ψ,r_.poles)                                  #Write rational function denominator in correct form in MathLink expression
-    Dexp = weval(addemup(Darrexp,length(Darrexp)))                          #Evaluate the built expression in MathLink form
-    #Dfactored = weval(W"Factor"(Dexp))                                      #Run Factor from Mathematica to turn expression into (x-z_1)(x-z_2)....(x-z_m)/(x-p_1)(x-p_2)...(x-p_m)
-    Dfactored = weval(W"Roots"(W"Equal"(Dexp,0),W"x"))                     #Run Reduce[] from Mathematica to get output x=z_1 || x=z_2 ... etc 
-    #print("\n",math2Expr(Dfactored))
-    #print("\n",math2Expr(Dexp))
-    roots = ExtractExpr(Dfactored,ComplexF64[])                                #Extract the roots (z_1,z_2,...z_m) from the denominator polynomial q(x)
-    if any(isnan,roots)
-        Dfactored = weval(W"Reduce"(W"Equal"(Dexp,0),W"x"))                 #In the tricky case where Reduce does not provide roots we run Roots function hoping that it would
-        roots = ExtractExpr(Dfactored,ComplexF64[])
-        if any(isnan,roots)
-            print("\n\nNo roots can be found! Exiting with same poles\n\n")
-            return r_.poles
-        end
-    end
+# function Find_roots_using_Mathematica(r_ :: VFit)
+#     Darrexp  = build_denom.(r_.ψ,r_.poles)                                  #Write rational function denominator in correct form in MathLink expression
+#     Dexp = weval(addemup(Darrexp,length(Darrexp)))                          #Evaluate the built expression in MathLink form
+#     #Dfactored = weval(W"Factor"(Dexp))                                      #Run Factor from Mathematica to turn expression into (x-z_1)(x-z_2)....(x-z_m)/(x-p_1)(x-p_2)...(x-p_m)
+#     Dfactored = weval(W"Roots"(W"Equal"(Dexp,0),W"x"))                     #Run Reduce[] from Mathematica to get output x=z_1 || x=z_2 ... etc 
+#     #print("\n",math2Expr(Dfactored))
+#     #print("\n",math2Expr(Dexp))
+#     roots = ExtractExpr(Dfactored,ComplexF64[])                                #Extract the roots (z_1,z_2,...z_m) from the denominator polynomial q(x)
+#     if any(isnan,roots)
+#         Dfactored = weval(W"Reduce"(W"Equal"(Dexp,0),W"x"))                 #In the tricky case where Reduce does not provide roots we run Roots function hoping that it would
+#         roots = ExtractExpr(Dfactored,ComplexF64[])
+#         if any(isnan,roots)
+#             print("\n\nNo roots can be found! Exiting with same poles\n\n")
+#             return r_.poles
+#         end
+#     end
 
-    return roots 
-end
+#     return roots 
+# end
 
 """
 This function returns the roots of the barycentric denominator q(x). The method below uses Julia's Polynomials.jl package. Thus keeping the procedure native
