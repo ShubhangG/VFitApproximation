@@ -234,7 +234,7 @@ Inputs  f:=               The function to approximate
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector, tol::Float64 =1e-10,force_conjugacy::Bool=false)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,force_conjugacy::Bool=false)
 
     cnt = 1                                                                 #Initialization of the count of iteration
     phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
@@ -289,7 +289,7 @@ Inputs  f_df:=  The function to approximate in the form of an Array which includ
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector, tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false)
+function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false)
     cnt = 1                                                                 #Initialization of the count of iteration
     
     #Split Training and testing into 80 percent train and 20 percent test
