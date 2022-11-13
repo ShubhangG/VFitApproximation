@@ -234,7 +234,7 @@ Inputs  f:=               The function to approximate
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,force_conjugacy::Bool=false)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,interations::Int=21,force_conjugacy::Bool=false)
 
     cnt = 1                                                                 #Initialization of the count of iteration
     phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
@@ -260,7 +260,9 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; t
         #r.poles = Find_roots_using_Mathematica(r)                           #Update the poles of the rational function
         new_poles = Find_roots_julia(r)
         if force_conjugacy
-            r.poles = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+            _poles_ = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+            sort!(_poles_,by=x->(real(x),imag(x)))
+            r.poles = _poles_
         else
             r.poles = new_poles
         end
@@ -289,7 +291,7 @@ Inputs  f_df:=  The function to approximate in the form of an Array which includ
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-10,  weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false)
+function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-10,  iterations::Int=21, weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false)
     cnt = 1                                                                 #Initialization of the count of iteration
     
     #Split Training and testing into 80 percent train and 20 percent test
@@ -342,7 +344,7 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(test_sqres)\n")
-    while (test_sqres>tol) && (cnt<21)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
+    while (test_sqres>tol) && (cnt<iterations)                                             #Convergence criteria of 50 used-- if iteration is >50 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         test_sqres = get_sqrerr(r,f_test)
         self_err = get_sqrerr(r,f_train)
@@ -353,7 +355,9 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-
         #r.poles = Find_roots_using_Mathematica(r)                                         #Update the poles of the rational function
         new_poles = Find_roots_julia(r)
         if force_conjugacy
-            r.poles = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+            _poles_ = [new_poles[1:2:end]; conj(new_poles[1:2:end])]
+            sort!(_poles_,by=x->(real(x),imag(x)))
+            r.poles = _poles_
         else
             r.poles = new_poles
         end
