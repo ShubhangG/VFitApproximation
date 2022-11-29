@@ -115,7 +115,7 @@ function get_phi_psi(f::Function,lambda::AbstractVector,xi::AbstractVector)
 end
 
 
-function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector,weights::Vector = Float64[])
+function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector;weights::Vector = Float64[],α::Number=0.0)
     m = length(xi)
     C1 = zeros(ComplexF64,length(l),length(xi))
     C2 = zeros(ComplexF64,length(l),length(xi))
@@ -133,7 +133,13 @@ function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector,weights
 
     W = Diagonal(sqrt.(weights))
     A = W*C
-    P = A\(W*Y)
+    if α==0
+        P = A\(W*Y)
+    else
+        Γ =  Γ_regrr(α,0,m)
+        P = (A'A+ Γ)/(A'(W*Y))
+    end
+
     #P = C\Y                                                    #Solve Cx=y matrix equation and get th phi's and psi's
     return P[1:m], P[m+1:2m]
 
@@ -234,7 +240,7 @@ Inputs  f:=               The function to approximate
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,interations::Int=21,force_conjugacy::Bool=false)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,iterations::Int=21,force_conjugacy::Bool=false)
 
     cnt = 1                                                                 #Initialization of the count of iteration
     phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
@@ -249,7 +255,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; t
     trainerrarr = Float64[]
     testerrarr = Float64[]
     print("The initial square error is: $(sqres)\n")
-    while (self_err>tol || sqres>10*tol) && cnt<21                          #Convergence criteria of 20 used-- if iteration is >20 times it is probably stuck in some local minima
+    while (self_err>tol || sqres>10*tol) && cnt<iterations                          #Convergence criteria of 20 used-- if iteration is >20 times it is probably stuck in some local minima
         print("At iteration ",cnt)
         sqres = get_sqrerr(r,f,test_λ)
         self_err = get_sqrerr(r,f,λ)
