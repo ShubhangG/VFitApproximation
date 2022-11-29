@@ -240,10 +240,10 @@ Inputs  f:=               The function to approximate
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,iterations::Int=21,force_conjugacy::Bool=false)
+function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; tol::Float64 =1e-10,iterations::Int=21,force_conjugacy::Bool=false,regression_param::Number=0.0)
 
     cnt = 1                                                                 #Initialization of the count of iteration
-    phi,psi = get_phi_psi(f,λ,ξ)                                            #Get the first φ and ψ
+    phi,psi = get_phi_psi(f,λ,ξ;α=regression_param)                                            #Get the first φ and ψ
     r = VFit(phi,psi,ξ)                                                     #Initialize the rational approximation r
 
     num= length(λ)
@@ -273,7 +273,7 @@ function vfitting(f::Function, m::Int, ξ::AbstractVector, λ::AbstractVector; t
             r.poles = new_poles
         end
          
-        r.φ, r.ψ = get_phi_psi(f,λ,r.poles)                                 #Get the next φ and ψ and update the rational function
+        r.φ, r.ψ = get_phi_psi(f,λ,r.poles;α=regression_param)                                 #Get the next φ and ψ and update the rational function
         #print("\nPoles\n",r.poles)
         cnt=cnt+1
     end
