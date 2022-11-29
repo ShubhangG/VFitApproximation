@@ -137,7 +137,8 @@ function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector;weights
         P = A\(W*Y)
     else
         Γ =  Γ_regrr(α,0,m)
-        P = (A'A+ Γ)/(A'(W*Y))
+        b=W*Y
+        P = (A'A+ Γ)\(A'b)
     end
 
     #P = C\Y                                                    #Solve Cx=y matrix equation and get th phi's and psi's
