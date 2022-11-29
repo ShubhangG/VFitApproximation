@@ -297,7 +297,7 @@ Inputs  f_df:=  The function to approximate in the form of an Array which includ
 Outputs r     := The rational function
         errors:= The training and testing errors faced
 """
-function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-10,  iterations::Int=21, weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false)
+function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-10,  iterations::Int=21, weightvec::AbstractVector = Float64[], force_conjugacy::Bool=false,regression_param::Number=0.0)
     cnt = 1                                                                 #Initialization of the count of iteration
     
     #Split Training and testing into 80 percent train and 20 percent test
@@ -341,7 +341,7 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-
 
 
     #Start the training
-    phi,psi = get_phi_psi(f_vec,λ,ξ,weights_train)                                     #Get the first φ and ψ
+    phi,psi = get_phi_psi(f_vec,λ,ξ;weights=weights_train,α=regression_param)                                     #Get the first φ and ψ
     r = VFit(phi,psi,ξ)                                                      #Initialize the rational approximation r
 
     num= length(λ)
@@ -368,7 +368,7 @@ function vfitting(f_df::DataFrame, m::Int, ξ::AbstractVector; tol::Float64 =1e-
             r.poles = new_poles
         end
         
-        r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles,weights_train)                             #Get the next φ and ψ and update the rational function
+        r.φ, r.ψ = get_phi_psi(f_vec,λ,r.poles,weights=weights_train,α=regression_param)                             #Get the next φ and ψ and update the rational function
 
         cnt=cnt+1
     end
