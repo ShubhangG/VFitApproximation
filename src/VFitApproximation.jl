@@ -136,7 +136,7 @@ function get_phi_psi(f_vec::Vector, l::AbstractVector,xi::AbstractVector;weights
     if α==0
         P = A\(W*Y)
     else
-        Γ =  Γ_regrr(α,0,m)
+        Γ =  Γ_regrr(α,α,m)
         b=W*Y
         P = (A'A+ Γ)\(A'b)
     end
